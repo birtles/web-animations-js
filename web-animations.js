@@ -262,9 +262,9 @@ var Player = function(token, source, timeline) {
   this._timeline = timeline;
   this._startTime =
       this.timeline.currentTime === null ? 0 : this.timeline.currentTime;
-  this._timeLag = 0.0;
+  this._storedTimeLag = 0.0;
   this._pausedState = false;
-  this._pauseTime = null;
+  this._pauseStartTime = null;
   this._playbackRate = 1.0;
   this._hasTicked = false;
 
@@ -307,20 +307,23 @@ Player.prototype = {
       this._currentTime = currentTime;
     } finally {
       exitModifyCurrentAnimationState(
-          this._hasTicked || this.startTime + this._timeLag <= lastTickTime);
+          this._hasTicked || this.startTime + this._storedTimeLag <= lastTickTime);
     }
   },
   get currentTime() {
     return this._currentTime === null ? 0 : this._currentTime;
   },
   set _currentTime(seekTime) {
-    // This seeks by updating _timeLag. It does not affect the startTime.
+    // This seeks by updating _storedTimeLag. It does not affect the startTime.
     if (this.paused) {
-      this._pauseTime = seekTime;
+      this._pauseStartTime = seekTime;
     } else {
-      this._timeLag = ((this.timeline.currentTime || 0) - this.startTime) *
+      var sourceContentEnd = this.source ? this.source.endTime : 0;
+      if (seekTime < 0 || seekTime >= sourceContentEnd) {
+        this._pauseStartTime = seekTime;
+      }
+      this._storedTimeLag = ((this.timeline.currentTime || 0) - this.startTime) *
           this.playbackRate - seekTime;
-      this._pauseTime = null;
     }
     this._update();
     maybeRestartAnimation();
@@ -330,43 +333,33 @@ Player.prototype = {
       return null;
     }
 
-    // The following is equivalent to doing:
-    // return (this.timeline.currentTime - this.startTime) *
-    //     this.playbackRate - this.timeLag;
-    // We avoid using this.timeLag to prevent floating point calculation
-    // inaccuracies from propagating.
-    if (this.paused) {
-      return this._pauseTime;
-    }
-    // This check is equivalent to "unbounded current time < zero".
-    if (this._unlaggedCurrentTime < this._timeLag) {
-      if (this._pauseTime === null) {
-        this._pauseTime = 0;
-      }
-      return this._pauseTime;
-    }
-    var sourceContentEnd = this.source ? this.source.endTime : 0;
+    //
+    // The code that was here to avoid floating-point inaccuracies was producing
+    // the wrong results so I removed it
+    //
 
-    // This check is equivalent to "unbounded current time > source end time".
-    if (this._unlaggedCurrentTime - sourceContentEnd > this._timeLag) {
-      if (this._pauseTime === null) {
-        this._pauseTime = sourceContentEnd;
-      }
-      return this._pauseTime;
-    }
-    if (this._pauseTime !== null) {
-      this._timeLag = this._pauseTimeLag;
-    }
-    this._pauseTime = null;
+    // Here is another optimization to avoid floating-point inaccuracies.
+    // Basically, if the time lag we get back is equivalent to the
+    // _pauseTimeLag, what we're really trying to do is create a time lag such
+    // that the current time becomes the pause start time so just return that.
+    if (this.timeLag == this._pauseTimeLag)
+      return this._pauseStartTime;
+
     return (this.timeline.currentTime - this.startTime) * this.playbackRate -
-        this._timeLag;
+        this.timeLag;
   },
   get _unboundedCurrentTime() {
-    return this._unlaggedCurrentTime - this._timeLag;
+    if (this.timeline.currentTime === null) {
+      return null;
+    }
+    if (this._pauseStartTime)
+      return this._pauseStartTime;
+    return (this.timeline.currentTime - this.startTime) * this.playbackRate -
+        this._storedTimeLag;
   },
   // _unlaggedCurrentTime is used in place of calculating the unbounded
   // current time directly to avoid introducing floating point calculation
-  // inaccuracies on this._timeLag.
+  // inaccuracies on this._storedTimeLag.
   get _unlaggedCurrentTime() {
     return ((this.timeline.currentTime || 0) - this.startTime) *
         this.playbackRate;
@@ -375,44 +368,44 @@ Player.prototype = {
     if (this.paused) {
       return this._pauseTimeLag;
     }
-    // This check is equivalent to "unbounded current time < zero".
-    if (this._unlaggedCurrentTime < this._timeLag) {
-      if (this._pauseTime === null) {
-        this._pauseTime = 0;
+    if (this._unboundedCurrentTime < 0) {
+      if (this._pauseStartTime === null) {
+        this._pauseStartTime = 0;
       }
       return this._pauseTimeLag;
     }
     var sourceContentEnd = this.source ? this.source.endTime : 0;
 
-    // This check is equivalent to "unbounded current time > source end time".
-    if (this._unlaggedCurrentTime - sourceContentEnd > this._timeLag) {
-      if (this._pauseTime === null) {
-        this._pauseTime = sourceContentEnd;
+    // XXXbb reversing breaks if this is >= ... is that ok?
+    // Should we make this conditional on the playback rate?
+    if (this._unboundedCurrentTime > sourceContentEnd) {
+      if (this._pauseStartTime === null) {
+        this._pauseStartTime = sourceContentEnd;
       }
       return this._pauseTimeLag;
     }
-    if (this._pauseTime !== null) {
-      this._timeLag = this._pauseTimeLag;
+    if (this._pauseStartTime !== null) {
+      this._storedTimeLag = this._pauseTimeLag;
     }
-    this._pauseTime = null;
-    return this._timeLag;
+    this._pauseStartTime = null;
+    return this._storedTimeLag;
   },
   get _pauseTimeLag() {
     return ((this.timeline.currentTime || 0) - this.startTime) *
-        this.playbackRate - this._pauseTime;
+        this.playbackRate - this._pauseStartTime;
   },
   set startTime(startTime) {
     enterModifyCurrentAnimationState();
     try {
       // This seeks by updating _startTime and hence the currentTime. It does
-      // not affect _timeLag.
+      // not affect _storedTimeLag.
       this._startTime = startTime;
       playersAreSorted = false;
       this._update();
       maybeRestartAnimation();
     } finally {
       exitModifyCurrentAnimationState(
-          this._hasTicked || this.startTime + this._timeLag <= lastTickTime);
+          this._hasTicked || this.startTime + this._storedTimeLag <= lastTickTime);
     }
   },
   get startTime() {
@@ -423,11 +416,11 @@ Player.prototype = {
       return;
     }
     if (this._pausedState) {
-      this._timeLag = this.timeLag;
-      this._pauseTime = null;
+      this._storedTimeLag = this.timeLag;
+      this._pauseStartTime = null;
       maybeRestartAnimation();
     } else {
-      this._pauseTime = this.currentTime;
+      this._pauseStartTime = this.currentTime;
     }
     this._pausedState = isPaused;
   },
@@ -452,7 +445,15 @@ Player.prototype = {
     return this._playbackRate;
   },
   get playing() {
-    return this.paused || this._pauseTime === null;
+    if (!this.source)
+      return false;
+    // XXXbb What should we do if playback rate is zero?
+    if (this.playbackRate >= 0)
+      return this._unboundedCurrentTime >= 0 &&
+             this._unboundedCurrentTime < this.source.endTime;
+    else
+      return this._unboundedCurrentTime > 0 &&
+             this._unboundedCurrentTime <= this.source.endTime;
   },
   cancel: function() {
     this.source = null;
@@ -475,8 +476,8 @@ Player.prototype = {
     }
     // This check is equivalent to "unbounded current time < zero ||
     // unbounded current time > source content end time".
-    if (this._unlaggedCurrentTime < this._timeLag ||
-        this._unlaggedCurrentTime - this.source.endTime >= this._timeLag) {
+    if (this._unlaggedCurrentTime < this._storedTimeLag ||
+        this._unlaggedCurrentTime - this.source.endTime >= this._storedTimeLag) {
       this.currentTime = this.playbackRate > 0 ? 0 : this.source.endTime;
     }
   },
