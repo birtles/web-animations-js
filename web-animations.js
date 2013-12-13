@@ -368,7 +368,8 @@ Player.prototype = {
     if (this.paused) {
       return this._pauseTimeLag;
     }
-    if (this._unboundedCurrentTime < 0) {
+    if (this._unboundedCurrentTime < 0 ||
+        (this.playbackRate < 0 && this._unboundedCurrentTime == 0)) {
       if (this._pauseStartTime === null) {
         this._pauseStartTime = 0;
       }
@@ -376,9 +377,9 @@ Player.prototype = {
     }
     var sourceContentEnd = this.source ? this.source.endTime : 0;
 
-    // XXXbb reversing breaks if this is >= ... is that ok?
-    // Should we make this conditional on the playback rate?
-    if (this._unboundedCurrentTime > sourceContentEnd) {
+    if (this._unboundedCurrentTime > sourceContentEnd ||
+        (this.playbackRate > 0 &&
+         this._unboundedCurrentTime == sourceContentEnd)) {
       if (this._pauseStartTime === null) {
         this._pauseStartTime = sourceContentEnd;
       }
