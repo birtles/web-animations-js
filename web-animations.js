@@ -315,15 +315,14 @@ Player.prototype = {
   },
   set _currentTime(seekTime) {
     // This seeks by updating _storedTimeLag. It does not affect the startTime.
-    if (this.paused) {
+    var sourceContentEnd = this.source ? this.source.endTime : 0;
+    if (this.paused || seekTime < 0 || seekTime >= sourceContentEnd) {
       this._pauseStartTime = seekTime;
-    } else {
-      var sourceContentEnd = this.source ? this.source.endTime : 0;
-      if (seekTime < 0 || seekTime >= sourceContentEnd) {
-        this._pauseStartTime = seekTime;
-      }
-      this._storedTimeLag = ((this.timeline.currentTime || 0) - this.startTime) *
-          this.playbackRate - seekTime;
+    }
+    if (!this.paused) {
+      this._storedTimeLag =
+        ((this.timeline.currentTime || 0) - this.startTime) *
+        this.playbackRate - seekTime;
     }
     this._update();
     maybeRestartAnimation();
@@ -401,6 +400,7 @@ Player.prototype = {
       // This seeks by updating _startTime and hence the currentTime. It does
       // not affect _storedTimeLag.
       this._startTime = startTime;
+      this._pauseStartTime = null;
       playersAreSorted = false;
       this._update();
       maybeRestartAnimation();
@@ -446,15 +446,21 @@ Player.prototype = {
     return this._playbackRate;
   },
   get playing() {
-    if (!this.source)
+    return this.source &&
+          !this._pausedState &&
+           this._pauseStartTime === null;
+    /*
+    // This code also works if using the definition of bounded proves
+    // insufficient.
+    if (!this.source || this._pausedState)
       return false;
-    // XXXbb What should we do if playback rate is zero?
     if (this.playbackRate >= 0)
       return this._unboundedCurrentTime >= 0 &&
              this._unboundedCurrentTime < this.source.endTime;
     else
       return this._unboundedCurrentTime > 0 &&
              this._unboundedCurrentTime <= this.source.endTime;
+    */
   },
   cancel: function() {
     this.source = null;

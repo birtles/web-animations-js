@@ -40,7 +40,7 @@ test("Pause", function() {
   // Pause
   player.pause();
   equal(player.paused, true, "Paused state after pausing");
-  equal(player.playing, true, "Playing state after pausing");
+  equal(player.playing, false, "Playing state after pausing");
 
   // Unpause
   player.play();
@@ -276,13 +276,107 @@ asyncTest("reverse() when seeked past end", function(assert) {
   }, 200);
 });
 
-// XXX Test reverse() in opposite direction
-// XXX Test the above cases in opposite direction
-// XXX Test play() works (including in opposite direction)
-// XXX Test setting startTime on a bounded player
-//      -- so that it ends up in range
-//      -- ends up still bounded
-//      -- ends up before the interval
+test("Set startTime on bounded player to put it in range", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  player.startTime = document.timeline.currentTime + 1;
+
+  // Check player is bounded
+  equal(player.currentTime, 0, "currentTime while waiting to start");
+  equal(player.playing, false, "playing state while waiting to start");
+
+  // Then put it in range
+  player.startTime -= 2;
+  assert.close(player.currentTime, 1, 0.1,
+               "currentTime after updating start time");
+  equal(player.playing, true, "playing state while after updating start time");
+
+  // Finish
+  player.cancel();
+});
+
+asyncTest("Set startTime on bounded player to leave it still before start",
+function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  player.startTime = document.timeline.currentTime + 1;
+
+  // Check player is bounded
+  equal(player.currentTime, 0, "currentTime while waiting to start");
+  equal(player.playing, false, "playing state while waiting to start");
+
+  // Then adjust start time
+  player.startTime -= 0.8;
+
+  // Check player is *still* bounded
+  equal(player.currentTime, 0, "currentTime while still waiting to start");
+  equal(player.playing, false, "playing state while still waiting to start");
+
+  // Verify the time *did* update though
+  setTimeout(function() {
+    assert.close(player.currentTime, 0.2, 0.1,
+                 "Current time after starting to play");
+    equal(player.playing, true, "Playing state after starting to play");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 400);
+});
+
+test("Set startTime on bounded player to put past the end", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  player.startTime = document.timeline.currentTime + 1;
+
+  // Check player is bounded
+  equal(player.currentTime, 0, "currentTime while waiting to start");
+  equal(player.playing, false, "playing state while waiting to start");
+
+  // Then put it past the end
+  player.startTime -= 5;
+  equal(player.currentTime, 3, "currentTime after end");
+  equal(player.playing, false, "playing state after end");
+
+  // Finish
+  player.cancel();
+});
+
+asyncTest("Reversing playbackRate before start", function(assert) {
+  // Set up player to start in 1s
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+  player.startTime = document.timeline.currentTime + 0.1;
+
+  // Check state
+  equal(player.currentTime, 0, "currentTime while waiting to start");
+  equal(player.playing, false, "playing state while waiting to start");
+
+  // Reverse playbackRate
+  player.playbackRate = -1;
+
+  // We should maintain the same current time
+  equal(player.currentTime, 0, "currentTime after updating playbackRate");
+  equal(player.playing, false, "playing state after updating playbackRate");
+
+  // If we wait a while we should be stuck at the end
+  setTimeout(function() {
+    equal(player.currentTime, 0, "currentTime after waiting");
+    equal(player.playing, false, "playing state after waiting");
+
+    // Call play and we should start from the end
+    player.play();
+    equal(player.currentTime, 3, "currentTime after play()");
+    equal(player.playing, true, "playing state after play()");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
 </script>
 </body>
 </html>
