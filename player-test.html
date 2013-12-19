@@ -346,7 +346,7 @@ test("Set startTime on bounded player to put past the end", function(assert) {
 });
 
 asyncTest("Reversing playbackRate before start", function(assert) {
-  // Set up player to start in 1s
+  // Set up player to start in 0.1s
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
   player.startTime = document.timeline.currentTime + 0.1;
@@ -405,6 +405,101 @@ asyncTest("Seeking from bounded to unbounded", function(assert) {
     start();
   }, 200);
 });
+
+asyncTest("play() on a finished reversed player", function(assert) {
+  // Set up player
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Seek to middle of interval and reverse
+  player.currentTime = 2;
+  player.reverse();
+
+  // Check state
+  equal(player.currentTime, 2, "currentTime after reversing");
+  equal(player.playing, true, "playing state after reversing");
+  equal(player.playbackRate, -1, "playing state after reversing");
+
+  // Finish
+  player.finish();
+  equal(player.currentTime, 0, "currentTime after finishing");
+  equal(player.playing, false, "playing state after finishing");
+
+  // Then play again
+  player.play();
+  equal(player.currentTime, 3, "currentTime after playing again");
+  equal(player.playing, true, "playing state after playing again");
+
+  // Check if actually progresses
+  setTimeout(function() {
+    assert.close(player.currentTime, 2.8, 0.1,
+                 "Current time after playing for a while");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+asyncTest("play() on player waiting to start kick-starts it", function(assert) {
+  // Set up player to start in 2s
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+  player.startTime = document.timeline.currentTime + 2;
+
+  // Check it is waiting to start
+  equal(player.currentTime, 0, "currentTime while waiting");
+  equal(player.playing, false, "playing state while waiting");
+
+  // Call play()
+  player.play();
+  equal(player.currentTime, 0, "currentTime after calling play()");
+  equal(player.playing, true, "playing state after calling play()");
+
+  // Check it really is playing
+  setTimeout(function() {
+    assert.close(player.currentTime, 0.2, 0.1,
+                 "Current time after playing for a while");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+/*
+ * Not sure if the following test is actually the desired behaviour since it
+ * would create a discontinuity between setting .currentTime = 0 and
+ * .currentTime =.001
+ */
+if (false) {
+  asyncTest("currentTime = 0 on player waiting to start has no effect",
+  function(assert) {
+    // Set up player to start in 2s
+    var player =
+      document.timeline.play(new Animation(null, null, { duration: 3 }));
+    player.startTime = document.timeline.currentTime + 2;
+
+    // Check it is waiting to start
+    equal(player.currentTime, 0, "currentTime while waiting");
+    equal(player.playing, false, "playing state while waiting");
+
+    // Set currentTime = 0
+    player.currentTime = 0;
+    equal(player.currentTime, 0, "currentTime after setting currentTime = 0");
+    equal(player.playing, false, "playing state after setting currentTime = 0");
+
+    // Check it is not playing
+    setTimeout(function() {
+      equal(player.currentTime, 0, "currentTime after waiting a while");
+      equal(player.playing, false, "playing state after waiting a while");
+
+      // Finish
+      player.cancel();
+      start();
+    }, 200);
+  });
+}
 </script>
 </body>
 </html>

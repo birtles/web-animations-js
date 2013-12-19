@@ -480,14 +480,20 @@ Player.prototype = {
   },
   play: function() {
     this._paused = false;
-    if (!this.source || this.playbackRate === 0) {
+    if (!this.source) {
       return;
     }
-    // This check is equivalent to "unbounded current time < zero ||
-    // unbounded current time > source content end time".
-    if (this._unlaggedCurrentTime < this._storedTimeLag ||
-        this._unlaggedCurrentTime - this.source.endTime >= this._storedTimeLag) {
-      this.currentTime = this.playbackRate > 0 ? 0 : this.source.endTime;
+    var effectivePosition = this._unboundedCurrentTime !== null ?
+                            this._unboundedCurrentTime :
+                            this.currentTime;
+    if (this.playbackRate > 0 &&
+        (effectivePosition < 0 ||
+         effectivePosition >= this.source.endTime)) {
+      this.currentTime = 0;
+    } else if (this.playbackRate < 0 &&
+       (effectivePosition <= 0 ||
+        effectivePosition > this.source.endTime)) {
+      this.currentTime = this.source.endTime;
     }
   },
   pause: function() {
