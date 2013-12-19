@@ -377,6 +377,34 @@ asyncTest("Reversing playbackRate before start", function(assert) {
     start();
   }, 200);
 });
+
+asyncTest("Seeking from bounded to unbounded", function(assert) {
+  // Set up player
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Seek to bounded time
+  player.currentTime = 4;
+
+  // Check state
+  equal(player.currentTime, 4, "currentTime while bounded");
+  equal(player.playing, false, "playing state while bounded");
+
+  // Seek to unbounded time
+  player.currentTime = 2;
+  equal(player.currentTime, 2, "currentTime while unbounded");
+  equal(player.playing, true, "playing state while unbounded");
+
+  // Check it actually is playing
+  setTimeout(function() {
+    assert.close(player.currentTime, 2.2, 0.1,
+                 "Current time after playing unbounded");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
 </script>
 </body>
 </html>

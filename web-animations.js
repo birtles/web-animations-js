@@ -318,6 +318,8 @@ Player.prototype = {
     var sourceContentEnd = this.source ? this.source.endTime : 0;
     if (this.paused || seekTime < 0 || seekTime >= sourceContentEnd) {
       this._pauseStartTime = seekTime;
+    } else {
+      this._pauseStartTime = null;
     }
     if (!this.paused) {
       this._storedTimeLag =
