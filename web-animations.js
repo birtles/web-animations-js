@@ -358,13 +358,6 @@ Player.prototype = {
     return (this.timeline.currentTime - this.startTime) * this.playbackRate -
         this._storedTimeLag;
   },
-  // _unlaggedCurrentTime is used in place of calculating the unbounded
-  // current time directly to avoid introducing floating point calculation
-  // inaccuracies on this._storedTimeLag.
-  get _unlaggedCurrentTime() {
-    return ((this.timeline.currentTime || 0) - this.startTime) *
-        this.playbackRate;
-  },
   get timeLag() {
     if (this.paused) {
       return this._pauseTimeLag;
