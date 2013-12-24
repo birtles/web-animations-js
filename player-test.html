@@ -154,6 +154,7 @@ asyncTest("reverse() before start", function(assert) {
   player.currentTime = -0.1;
 
   // Check state 
+  assert.close(player.currentTime, -0.1, 0.01, "Current time before reversing");
   equal(player.finished, false, "Finished state before reversing");
 
   // Reverse
@@ -290,7 +291,8 @@ test("Adjust start time (1)", function(assert) {
 
   player.startTime = document.timeline.currentTime + 1;
 
-  equal(player.currentTime, -1, "currentTime while waiting to start");
+  assert.close(player.currentTime, -1, 0.1,
+               "currentTime while waiting to start");
   equal(player.finished, false, "Finished state while waiting to start");
 
   // Then put it in range
@@ -311,7 +313,8 @@ function(assert) {
 
   player.startTime = document.timeline.currentTime + 1;
 
-  equal(player.currentTime, -1, "currentTime while waiting to start");
+  assert.close(player.currentTime, -1, 0.1,
+               "currentTime while waiting to start");
   equal(player.finished, false, "Finished state while waiting to start");
 
   // Then adjust start time
@@ -621,7 +624,6 @@ asyncTest("Shortening source does not block in reverse", function(assert) {
   }, 200);
 });
 
-// XXX Make source length shorter doesn't block when in reverse
 </script>
 </body>
 </html>
