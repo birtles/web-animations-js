@@ -624,6 +624,38 @@ asyncTest("Shortening source does not block in reverse", function(assert) {
   }, 200);
 });
 
+asyncTest("Async add content", function(assert) {
+  // Add empty animation
+  var player = document.timeline.play(new Animation());
+
+  // Check we don't progress
+  equal(player.currentTime, 0, "currentTime before adding content");
+  equal(player.finished, true, "Finished state before adding content");
+
+  // Wait and check we don't progress
+  setTimeout(function() {
+    equal(player.currentTime, 0, "currentTime after waiting");
+    equal(player.finished, true, "Finished state after waiting");
+
+    // "Add" content
+    player.source.specified.duration = 3;
+
+    // We should pick up from 0, not jump 0.2s in
+    equal(player.currentTime, 0, "currentTime after extending");
+    equal(player.finished, false, "Finished state after extending");
+
+    // Wait and check
+    setTimeout(function() {
+      assert.close(player.currentTime, 0.2, 0.1,
+                   "currentTime after extending and waiting");
+
+      // Finish
+      player.cancel();
+      start();
+    }, 200);
+  }, 200);
+});
+
 </script>
 </body>
 </html>
