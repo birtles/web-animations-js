@@ -317,15 +317,6 @@ Player.prototype = {
     // This seeks by updating _storedTimeLag. It does not affect the startTime.
     var sourceContentEnd = this.source ? this.source.endTime : 0;
     this._pauseStartTime = seekTime;
-    /* XXX
-    if (this.paused ||
-        (this.playbackRate > 0 && seekTime >= sourceContentEnd) ||
-        (this.playbackRate < 0 && seekTime <= 0)) {
-      this._pauseStartTime = seekTime;
-    } else {
-      this._pauseStartTime = null;
-    }
-    */
     if (!this.paused) {
       this._storedTimeLag =
         ((this.timeline.currentTime || 0) - this.startTime) *
@@ -350,19 +341,12 @@ Player.prototype = {
         (this.timeline.currentTime - this.startTime) * this.playbackRate -
         this.timeLag;
     return this._pauseStartTime;
-    /* XXX
-    return (this.timeline.currentTime - this.startTime) * this.playbackRate -
-        this.timeLag;
-        */
   },
   get _unboundedCurrentTime() {
     if (this.timeline.currentTime === null) {
       return null;
     }
-    /* XXX
-    if (this._pauseStartTime)
-      return this._pauseStartTime;
-      */
+
     return (this.timeline.currentTime - this.startTime) * this.playbackRate -
         this._storedTimeLag;
   },
@@ -370,21 +354,16 @@ Player.prototype = {
     if (this.paused) {
       return this._pauseTimeLag;
     }
+
     if (this.playbackRate < 0 && this._unboundedCurrentTime <= 0) {
       this._storedTimeLag =
              this._pauseStartTime <= 0 ?
              this._pauseTimeLag :
              (this.timeline.currentTime - this.startTime) * this.playbackRate;
       return this._storedTimeLag;
-      /* XXX
-      if (this._pauseStartTime === null) {
-        this._pauseStartTime = 0;
-      }
-      return this._pauseTimeLag;
-      */
     }
-    var sourceContentEnd = this.source ? this.source.endTime : 0;
 
+    var sourceContentEnd = this.source ? this.source.endTime : 0;
     if (this.playbackRate > 0 &&
         this._unboundedCurrentTime >= sourceContentEnd) {
       this._storedTimeLag =
@@ -393,19 +372,8 @@ Player.prototype = {
              (this.timeline.currentTime - this.startTime) * this.playbackRate -
                 sourceContentEnd;
       return this._storedTimeLag;
-      /* XXX
-      if (this._pauseStartTime === null) {
-        this._pauseStartTime = sourceContentEnd;
-      }
-      return this._pauseTimeLag;
-      */
     }
-    /* XXX This was basically doing our unpausing
-    if (this._pauseStartTime !== null) {
-      this._storedTimeLag = this._pauseTimeLag;
-    }
-    this._pauseStartTime = null;
-    */
+
     return this._storedTimeLag;
   },
   get _pauseTimeLag() {
