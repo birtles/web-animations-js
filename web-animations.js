@@ -334,8 +334,10 @@ Player.prototype = {
     // Basically, if the time lag we get back is equivalent to the
     // _pauseTimeLag, what we're really trying to do is create a time lag such
     // that the current time becomes the pause start time so just return that.
+    /* XXX restore this
     if (this.timeLag == this._pauseTimeLag)
       return this._pauseStartTime;
+      */
 
     this._pauseStartTime =
         (this.timeline.currentTime - this.startTime) * this.playbackRate -
@@ -356,22 +358,21 @@ Player.prototype = {
     }
 
     if (this.playbackRate < 0 && this._unboundedCurrentTime <= 0) {
-      this._storedTimeLag =
-             this._pauseStartTime <= 0 ?
-             this._pauseTimeLag :
-             (this.timeline.currentTime - this.startTime) * this.playbackRate;
-      return this._storedTimeLag;
+      if (this._pauseStartTime > 0) {
+        this._pauseStartTime = 0;
+      }
+      this._storedTimeLag = this._pauseTimeLag;
+      return this._pauseTimeLag;
     }
 
     var sourceContentEnd = this.source ? this.source.endTime : 0;
     if (this.playbackRate > 0 &&
         this._unboundedCurrentTime >= sourceContentEnd) {
-      this._storedTimeLag =
-             this._pauseStartTime >= sourceContentEnd ?
-             this._pauseTimeLag :
-             (this.timeline.currentTime - this.startTime) * this.playbackRate -
-                sourceContentEnd;
-      return this._storedTimeLag;
+      if (this._pauseStartTime < sourceContentEnd) {
+        this._pauseStartTime = sourceContentEnd;
+      }
+      this._storedTimeLag = this._pauseTimeLag;
+      return this._pauseTimeLag;
     }
 
     return this._storedTimeLag;
