@@ -316,7 +316,9 @@ Player.prototype = {
   set _currentTime(seekTime) {
     // This seeks by updating _storedTimeLag. It does not affect the startTime.
     var sourceContentEnd = this.source ? this.source.endTime : 0;
-    if (this.paused || seekTime < 0 || seekTime >= sourceContentEnd) {
+    if (this.paused ||
+        (this.playbackRate > 0 && seekTime >= sourceContentEnd) ||
+        (this.playbackRate < 0 && seekTime <= 0)) {
       this._pauseStartTime = seekTime;
     } else {
       this._pauseStartTime = null;
@@ -333,11 +335,6 @@ Player.prototype = {
     if (this.timeline.currentTime === null) {
       return null;
     }
-
-    //
-    // The code that was here to avoid floating-point inaccuracies was producing
-    // the wrong results so I removed it
-    //
 
     // Here is another optimization to avoid floating-point inaccuracies.
     // Basically, if the time lag we get back is equivalent to the
@@ -362,8 +359,7 @@ Player.prototype = {
     if (this.paused) {
       return this._pauseTimeLag;
     }
-    if (this._unboundedCurrentTime < 0 ||
-        (this.playbackRate < 0 && this._unboundedCurrentTime == 0)) {
+    if (this.playbackRate < 0 && this._unboundedCurrentTime <= 0) {
       if (this._pauseStartTime === null) {
         this._pauseStartTime = 0;
       }
@@ -371,9 +367,8 @@ Player.prototype = {
     }
     var sourceContentEnd = this.source ? this.source.endTime : 0;
 
-    if (this._unboundedCurrentTime > sourceContentEnd ||
-        (this.playbackRate > 0 &&
-         this._unboundedCurrentTime == sourceContentEnd)) {
+    if (this.playbackRate > 0 &&
+        this._unboundedCurrentTime >= sourceContentEnd) {
       if (this._pauseStartTime === null) {
         this._pauseStartTime = sourceContentEnd;
       }
@@ -440,22 +435,10 @@ Player.prototype = {
   get playbackRate() {
     return this._playbackRate;
   },
-  get playing() {
+  get finished() {
     return this.source &&
-          !this._pausedState &&
-           this._pauseStartTime === null;
-    /*
-    // This code also works if using the definition of bounded proves
-    // insufficient.
-    if (!this.source || this._pausedState)
-      return false;
-    if (this.playbackRate >= 0)
-      return this._unboundedCurrentTime >= 0 &&
-             this._unboundedCurrentTime < this.source.endTime;
-    else
-      return this._unboundedCurrentTime > 0 &&
-             this._unboundedCurrentTime <= this.source.endTime;
-    */
+       ((this.playbackRate > 0 && this.currentTime >= this.source.endTime) ||
+        (this.playbackRate < 0 && this.currentTime <= 0));
   },
   cancel: function() {
     this.source = null;

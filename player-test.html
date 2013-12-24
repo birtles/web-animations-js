@@ -27,7 +27,7 @@ test("Initial state", function() {
   equal(anim.player.timeLag, 0, "Initial time lag");
   equal(anim.player.playbackRate, 1, "Initial playback rate");
   equal(anim.player.paused, false, "Initial paused state");
-  equal(anim.player.playing, true, "Initial playing state");
+  equal(anim.player.finished, false, "Initial finished state");
 
   // Finish
   anim.player.cancel();
@@ -40,18 +40,18 @@ test("Pause", function() {
   // Pause
   player.pause();
   equal(player.paused, true, "Paused state after pausing");
-  equal(player.playing, false, "Playing state after pausing");
+  equal(player.finished, false, "Finished state after pausing");
 
   // Unpause
   player.play();
   equal(player.paused, false, "Paused state after unpausing");
-  equal(player.playing, true, "Playing state after unpausing");
+  equal(player.finished, false, "Finished state after unpausing");
 
   // Finish
   player.cancel();
 });
 
-asyncTest("Seek behind content (forwards)", function() {
+asyncTest("Seek behind content (forwards)", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
@@ -59,11 +59,11 @@ asyncTest("Seek behind content (forwards)", function() {
   player.currentTime = -0.1;
   equal(player.currentTime, -0.1, "Current time after seeking before start");
   equal(player.paused, false, "Paused state after seeking before start");
-  equal(player.playing, false, "Playing state after seeking before start");
+  equal(player.finished, false, "Finished state after seeking before start");
 
-  // Check player does not progress
+  // Check player does progress
   setTimeout(function() {
-    equal(player.currentTime, -0.1, "Current time should not progress");
+    assert.close(player.currentTime, 0.1, 0.05, "Current time should progress");
 
     // Finish
     player.cancel();
@@ -71,7 +71,7 @@ asyncTest("Seek behind content (forwards)", function() {
   }, 200);
 });
 
-asyncTest("Bounding at start", function(assert) {
+asyncTest("No bounding at start", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
@@ -79,15 +79,16 @@ asyncTest("Bounding at start", function(assert) {
   player.startTime = document.timeline.currentTime + 0.1;
 
   // Check state of player
-  equal(player.currentTime, 0, "Current time while waiting to start");
+  assert.close(player.currentTime, -0.1, 0.05,
+               "Current time while waiting to start");
   equal(player.paused, false, "Paused state while waiting to start");
-  equal(player.playing, false, "Playing state while waiting to start");
+  equal(player.finished, false, "Finished state while waiting to start");
 
   // Check player starts automatically
   setTimeout(function() {
     assert.close(player.currentTime, 0.1, 0.05, "Current time should progress");
     equal(player.paused, false, "Paused state after starting");
-    equal(player.playing, true, "Playing state after starting");
+    equal(player.finished, false, "Finished state after starting");
 
     // Finish
     player.cancel();
@@ -105,14 +106,14 @@ asyncTest("Bounding at end (seek with current time)", function(assert) {
   // Check state of player
   assert.close(player.currentTime, 2.9, 0.01, "Current time just before end");
   equal(player.paused, false, "Paused state just before end");
-  equal(player.playing, true, "Playing state just before end");
+  equal(player.finished, false, "Finished state just before end");
 
   // Check player after finishing
   setTimeout(function() {
     assert.close(player.currentTime, 3.0, 0.05,
                  "Current time when bounded progress");
     equal(player.paused, false, "Paused state after ending");
-    equal(player.playing, false, "Playing state after ending");
+    equal(player.finished, true, "Finished state after ending");
 
     // Finish
     player.cancel();
@@ -130,14 +131,14 @@ asyncTest("Bounding at end (seek with start time)", function(assert) {
   // Check state of player
   assert.close(player.currentTime, 2.9, 0.01, "Current time just before end");
   equal(player.paused, false, "Paused state just before end");
-  equal(player.playing, true, "Playing state just before end");
+  equal(player.finished, false, "Finished state just before end");
 
   // Check player after finishing
   setTimeout(function() {
     assert.close(player.currentTime, 3.0, 0.05,
                  "Current time when bounded progress");
     equal(player.paused, false, "Paused state after ending");
-    equal(player.playing, false, "Playing state after ending");
+    equal(player.finished, true, "Finished state after ending");
 
     // Finish
     player.cancel();
@@ -145,23 +146,26 @@ asyncTest("Bounding at end (seek with start time)", function(assert) {
   }, 200);
 });
 
-asyncTest("reverse() before start", function() {
+asyncTest("reverse() before start", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
   // Seek before start
   player.currentTime = -0.1;
 
+  // Check state 
+  equal(player.finished, false, "Finished state before reversing");
+
   // Reverse
   player.reverse();
-  equal(player.currentTime, -0.1, "Current time after reversing");
-  equal(player.playing, false, "Playing state after reversing");
+  assert.close(player.currentTime, -0.1, 0.01, "Current time after reversing");
+  equal(player.finished, true, "Finished state after reversing");
   equal(player.playbackRate, -1, "Playback rate after reversing");
 
   // Check player after some time
   setTimeout(function() {
-    equal(player.currentTime, -0.1, "Current time later");
-    equal(player.playing, false, "Playing state later");
+    assert.close(player.currentTime, -0.1, 0.01, "Current time later");
+    equal(player.finished, true, "Finished state later");
 
     // Finish
     player.cancel();
@@ -176,13 +180,13 @@ asyncTest("reverse() at start", function() {
   // Reverse
   player.reverse();
   equal(player.currentTime, 0, "Current time after reversing");
-  equal(player.playing, false, "Playing state after reversing");
+  equal(player.finished, true, "Finished state after reversing");
   equal(player.playbackRate, -1, "Playback rate after reversing");
 
   // Check player after some time
   setTimeout(function() {
     equal(player.currentTime, 0, "Current time later");
-    equal(player.playing, false, "Playing state later");
+    equal(player.finished, true, "Finished state later");
 
     // Finish
     player.cancel();
@@ -200,13 +204,13 @@ asyncTest("reverse() while playing", function(assert) {
   // Reverse
   player.reverse();
   equal(player.currentTime, 1.5, "Current time after reversing");
-  equal(player.playing, true, "Playing state after reversing");
+  equal(player.finished, false, "Finished state after reversing");
   equal(player.playbackRate, -1, "Playback rate after reversing");
 
   // Check player after some time
   setTimeout(function() {
     assert.close(player.currentTime, 1.3, 0.05, "Current time when reversing");
-    equal(player.playing, true, "Playing state later");
+    equal(player.finished, false, "Finished state later");
 
     // Finish
     player.cancel();
@@ -224,19 +228,19 @@ asyncTest("reverse() when finished", function(assert) {
   // Wait to finish
   setTimeout(function() {
     assert.close(player.currentTime, 3.0, 0.01, "Current time when finished");
-    equal(player.playing, false, "Playing state after finished");
+    equal(player.finished, true, "Finished state after finished");
 
     // Reverse
     player.reverse();
     equal(player.currentTime, 3.0, "Current time after reversing");
-    equal(player.playing, true, "Playing state after reversing");
+    equal(player.finished, false, "Finished state after reversing");
     equal(player.playbackRate, -1, "Playback rate after reversing");
 
     // Check we actually reverse
     setTimeout(function() {
       assert.close(player.currentTime, 2.8, 0.1,
                    "Current time after beginning reverse");
-      equal(player.playing, true, "Playing state after reversing");
+      equal(player.finished, false, "Finished state after reversing");
 
       // Finish
       player.cancel();
@@ -255,19 +259,19 @@ asyncTest("reverse() when seeked past end", function(assert) {
   // Check it is bounded
   setTimeout(function() {
     equal(player.currentTime, 4.0, "Current time when seeked past end");
-    equal(player.playing, false, "Playing state when seeked past end");
+    equal(player.finished, true, "Finished state when seeked past end");
 
     // Reverse
     player.reverse();
     equal(player.currentTime, 3.0, "Current time after reversing");
-    equal(player.playing, true, "Playing state after reversing");
+    equal(player.finished, false, "Finished state after reversing");
     equal(player.playbackRate, -1, "Playback rate after reversing");
 
     // Check we actually reverse
     setTimeout(function() {
       assert.close(player.currentTime, 2.8, 0.1,
                    "Current time after beginning reverse");
-      equal(player.playing, true, "Playing state after reversing");
+      equal(player.finished, false, "Finished state after reversing");
 
       // Finish
       player.cancel();
@@ -276,49 +280,53 @@ asyncTest("reverse() when seeked past end", function(assert) {
   }, 200);
 });
 
-test("Set startTime on bounded player to put it in range", function(assert) {
+// The following two "Adjust start time" tests no longer make any sense because
+// they were testing bounded start behaviour but we no longer have that.
+// They're here just to make sure the new model behaves as expected in these
+// cases.
+test("Adjust start time (1)", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
   player.startTime = document.timeline.currentTime + 1;
 
-  // Check player is bounded
-  equal(player.currentTime, 0, "currentTime while waiting to start");
-  equal(player.playing, false, "playing state while waiting to start");
+  equal(player.currentTime, -1, "currentTime while waiting to start");
+  equal(player.finished, false, "Finished state while waiting to start");
 
   // Then put it in range
   player.startTime -= 2;
   assert.close(player.currentTime, 1, 0.1,
                "currentTime after updating start time");
-  equal(player.playing, true, "playing state while after updating start time");
+  equal(player.finished, false,
+        "Finished state while after updating start time");
 
   // Finish
   player.cancel();
 });
 
-asyncTest("Set startTime on bounded player to leave it still before start",
+asyncTest("Adjust start time (2)",
 function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
   player.startTime = document.timeline.currentTime + 1;
 
-  // Check player is bounded
-  equal(player.currentTime, 0, "currentTime while waiting to start");
-  equal(player.playing, false, "playing state while waiting to start");
+  equal(player.currentTime, -1, "currentTime while waiting to start");
+  equal(player.finished, false, "Finished state while waiting to start");
 
   // Then adjust start time
   player.startTime -= 0.8;
 
-  // Check player is *still* bounded
-  equal(player.currentTime, 0, "currentTime while still waiting to start");
-  equal(player.playing, false, "playing state while still waiting to start");
+  // Check player is still waiting
+  assert.close(player.currentTime, -0.2, 0.1,
+               "currentTime while waiting to start");
+  equal(player.finished, false, "Finished state while still waiting to start");
 
   // Verify the time *did* update though
   setTimeout(function() {
     assert.close(player.currentTime, 0.2, 0.1,
-                 "Current time after starting to play");
-    equal(player.playing, true, "Playing state after starting to play");
+                 "currentTime after starting to play");
+    equal(player.finished, false, "Finished state after starting to play");
 
     // Finish
     player.cancel();
@@ -326,20 +334,20 @@ function(assert) {
   }, 400);
 });
 
-test("Set startTime on bounded player to put past the end", function(assert) {
+test("Adjust start time (3)", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
   player.startTime = document.timeline.currentTime + 1;
 
-  // Check player is bounded
-  equal(player.currentTime, 0, "currentTime while waiting to start");
-  equal(player.playing, false, "playing state while waiting to start");
+  assert.close(player.currentTime, -1, 0.05,
+               "currentTime after while waiting to start");
+  equal(player.finished, false, "Finished state while waiting to start");
 
   // Then put it past the end
   player.startTime -= 5;
   equal(player.currentTime, 3, "currentTime after end");
-  equal(player.playing, false, "playing state after end");
+  equal(player.finished, true, "Finished state after end");
 
   // Finish
   player.cancel();
@@ -352,25 +360,27 @@ asyncTest("Reversing playbackRate before start", function(assert) {
   player.startTime = document.timeline.currentTime + 0.1;
 
   // Check state
-  equal(player.currentTime, 0, "currentTime while waiting to start");
-  equal(player.playing, false, "playing state while waiting to start");
+  assert.close(player.currentTime, -0.1, 0.05,
+               "currentTime after while waiting to start");
+  equal(player.finished, false, "Finished state while waiting to start");
 
   // Reverse playbackRate
   player.playbackRate = -1;
 
   // We should maintain the same current time
-  equal(player.currentTime, 0, "currentTime after updating playbackRate");
-  equal(player.playing, false, "playing state after updating playbackRate");
+  assert.close(player.currentTime, -0.1, 0.05,
+               "currentTime after updating playbackRate");
+  equal(player.finished, true, "Finished state after updating playbackRate");
 
   // If we wait a while we should be stuck at the end
   setTimeout(function() {
-    equal(player.currentTime, 0, "currentTime after waiting");
-    equal(player.playing, false, "playing state after waiting");
+    assert.close(player.currentTime, -0.1, 0.05, "currentTime after waiting");
+    equal(player.finished, true, "Finished state after waiting");
 
     // Call play and we should start from the end
     player.play();
     equal(player.currentTime, 3, "currentTime after play()");
-    equal(player.playing, true, "playing state after play()");
+    equal(player.finished, false, "Finished state after play()");
 
     // Finish
     player.cancel();
@@ -378,7 +388,7 @@ asyncTest("Reversing playbackRate before start", function(assert) {
   }, 200);
 });
 
-asyncTest("Seeking from bounded to unbounded", function(assert) {
+asyncTest("Seeking from end to playing", function(assert) {
   // Set up player
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
@@ -388,12 +398,12 @@ asyncTest("Seeking from bounded to unbounded", function(assert) {
 
   // Check state
   equal(player.currentTime, 4, "currentTime while bounded");
-  equal(player.playing, false, "playing state while bounded");
+  equal(player.finished, true, "Finished state while bounded");
 
   // Seek to unbounded time
   player.currentTime = 2;
   equal(player.currentTime, 2, "currentTime while unbounded");
-  equal(player.playing, true, "playing state while unbounded");
+  equal(player.finished, false, "Finished state while unbounded");
 
   // Check it actually is playing
   setTimeout(function() {
@@ -417,18 +427,18 @@ asyncTest("play() on a finished reversed player", function(assert) {
 
   // Check state
   equal(player.currentTime, 2, "currentTime after reversing");
-  equal(player.playing, true, "playing state after reversing");
-  equal(player.playbackRate, -1, "playing state after reversing");
+  equal(player.finished, false, "Finished state after reversing");
+  equal(player.playbackRate, -1, "Playback rate after reversing");
 
   // Finish
   player.finish();
   equal(player.currentTime, 0, "currentTime after finishing");
-  equal(player.playing, false, "playing state after finishing");
+  equal(player.finished, true, "Finished state after finishing");
 
   // Then play again
   player.play();
   equal(player.currentTime, 3, "currentTime after playing again");
-  equal(player.playing, true, "playing state after playing again");
+  equal(player.finished, false, "Finished state after playing again");
 
   // Check if actually progresses
   setTimeout(function() {
@@ -448,13 +458,13 @@ asyncTest("play() on player waiting to start kick-starts it", function(assert) {
   player.startTime = document.timeline.currentTime + 2;
 
   // Check it is waiting to start
-  equal(player.currentTime, 0, "currentTime while waiting");
-  equal(player.playing, false, "playing state while waiting");
+  assert.close(player.currentTime, -2, 0.1, "currentTime while waiting");
+  equal(player.finished, false, "Finished state while waiting");
 
   // Call play()
   player.play();
   equal(player.currentTime, 0, "currentTime after calling play()");
-  equal(player.playing, true, "playing state after calling play()");
+  equal(player.finished, false, "Finished state after calling play()");
 
   // Check it really is playing
   setTimeout(function() {
@@ -467,39 +477,151 @@ asyncTest("play() on player waiting to start kick-starts it", function(assert) {
   }, 200);
 });
 
-/*
- * Not sure if the following test is actually the desired behaviour since it
- * would create a discontinuity between setting .currentTime = 0 and
- * .currentTime =.001
- */
-if (false) {
-  asyncTest("currentTime = 0 on player waiting to start has no effect",
-  function(assert) {
-    // Set up player to start in 2s
-    var player =
-      document.timeline.play(new Animation(null, null, { duration: 3 }));
-    player.startTime = document.timeline.currentTime + 2;
+asyncTest("currentTime = 0 on player waiting to start is ok",
+function(assert) {
+  // Set up player to start in 2s
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+  player.startTime = document.timeline.currentTime + 2;
 
-    // Check it is waiting to start
-    equal(player.currentTime, 0, "currentTime while waiting");
-    equal(player.playing, false, "playing state while waiting");
+  // Check it is waiting to start
+  assert.close(player.currentTime, -2, 0.1, "currentTime while waiting");
+  equal(player.finished, false, "Finished state while waiting");
 
-    // Set currentTime = 0
-    player.currentTime = 0;
-    equal(player.currentTime, 0, "currentTime after setting currentTime = 0");
-    equal(player.playing, false, "playing state after setting currentTime = 0");
+  // Set currentTime = 0
+  player.currentTime = 0;
+  equal(player.currentTime, 0, "currentTime after setting currentTime = 0");
+  equal(player.finished, false, "Finished state after setting currentTime = 0");
 
-    // Check it is not playing
+  // Check it is playing
+  setTimeout(function() {
+    assert.close(player.currentTime, 0.2, 0.1,
+                 "currentTime after waiting a while");
+    equal(player.finished, false, "Finished state after waiting a while");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+asyncTest("Extending source unblocks player (seek past end)", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Set currentTime = 4
+  player.currentTime = 4;
+  equal(player.currentTime, 4, "currentTime after setting currentTime = 4");
+  equal(player.finished, true, "Finished state after setting currentTime = 4");
+
+  // Check it is NOT playing
+  setTimeout(function() {
+    equal(player.currentTime, 4, "currentTime after waiting a while");
+
+    // Extend source
+    player.source.specified.duration = 5;
+    equal(player.currentTime, 4, "currentTime after extending source");
+    equal(player.finished, false, "Finished state after extending source");
+
+    // Check it IS playing
     setTimeout(function() {
-      equal(player.currentTime, 0, "currentTime after waiting a while");
-      equal(player.playing, false, "playing state after waiting a while");
+      assert.close(player.currentTime, 4.2, 0.1,
+                   "currentTime after waiting a while again");
 
       // Finish
       player.cancel();
       start();
     }, 200);
-  });
-}
+  }, 200);
+});
+
+asyncTest("Extending source unblocks player (end normally)", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Set currentTime to just before the end
+  player.currentTime = 2.95;
+  equal(player.finished, false, "Finished state just before ending");
+
+  // Play to end
+  setTimeout(function() {
+    equal(player.currentTime, 3, "currentTime after ending normally");
+    equal(player.finished, true, "Finished state after ending normally");
+
+    // Extend source
+    player.source.specified.duration = 5;
+    assert.close(player.currentTime, 3.0, 0.1,
+                 "currentTime after extending source");
+    equal(player.finished, false, "Finished state after extending source");
+
+    // Check it is playing
+    setTimeout(function() {
+      assert.close(player.currentTime, 3.2, 0.1,
+                   "currentTime after waiting a while again");
+
+      // Finish
+      player.cancel();
+      start();
+    }, 200);
+  }, 200);
+});
+
+asyncTest("Shortening source blocks player", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Set currentTime to just before the end
+  player.currentTime = 2;
+  assert.close(player.currentTime, 2.0, 0.1,
+               "currentTime before shortening");
+  equal(player.finished, false, "Finished state before shortening");
+
+  // Shorten source
+  player.source.specified.duration = 1;
+  assert.close(player.currentTime, 2.0, 0.1,
+               "currentTime after shortening");
+  equal(player.finished, true, "Finished state after shortening");
+
+  // Check it is not playing
+  setTimeout(function() {
+    assert.close(player.currentTime, 2.0, 0.1,
+                 "currentTime after shortening");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+asyncTest("Shortening source does not block in reverse", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Set currentTime to just before the end
+  player.currentTime = 2;
+  player.reverse();
+  assert.close(player.currentTime, 2.0, 0.1,
+               "currentTime before shortening");
+  equal(player.finished, false, "Finished state before shortening");
+
+  // Shorten source
+  player.source.specified.duration = 1;
+  assert.close(player.currentTime, 2.0, 0.1,
+               "currentTime after shortening");
+  equal(player.finished, false, "Finished state after shortening");
+
+  // Check it is playing
+  setTimeout(function() {
+    assert.close(player.currentTime, 1.8, 0.1,
+                 "currentTime after shortening");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+// XXX Make source length shorter doesn't block when in reverse
 </script>
 </body>
 </html>
