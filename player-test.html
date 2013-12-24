@@ -596,6 +596,34 @@ asyncTest("Shortening source blocks player", function(assert) {
   }, 200);
 });
 
+asyncTest("Shortening source blocks player when playing", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Set currentTime to midway
+  player.currentTime = 1.5;
+  assert.close(player.currentTime, 1.5, 0.1,
+               "currentTime before shortening");
+  equal(player.finished, false, "Finished state after seeking");
+
+  // Let it play for a while
+  setTimeout(function() {
+    assert.close(player.currentTime, 1.7, 0.1,
+                 "currentTime before shortening");
+    equal(player.finished, false, "Finished state before shortening");
+
+    // Shorten source
+    player.source.specified.duration = 1;
+    assert.close(player.currentTime, 1.7, 0.1,
+                 "currentTime after shortening");
+    equal(player.finished, true, "Finished state after shortening");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
 asyncTest("Shortening source does not block in reverse", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
