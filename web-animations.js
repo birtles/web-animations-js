@@ -264,7 +264,7 @@ var Player = function(token, source, timeline) {
       this.timeline.currentTime === null ? 0 : this.timeline.currentTime;
   this._storedTimeLag = 0.0;
   this._pausedState = false;
-  this._pauseStartTime = null;
+  this._previousCurrentTime = null;
   this._playbackRate = 1.0;
   this._hasTicked = false;
 
@@ -316,7 +316,7 @@ Player.prototype = {
   set _currentTime(seekTime) {
     // This seeks by updating _storedTimeLag. It does not affect the startTime.
     var sourceContentEnd = this.source ? this.source.endTime : 0;
-    this._pauseStartTime = seekTime;
+    this._previousCurrentTime = seekTime;
     if (!this.paused) {
       this._storedTimeLag =
         ((this.timeline.currentTime || 0) - this.startTime) *
@@ -336,15 +336,15 @@ Player.prototype = {
     // that the current time becomes the pause start time so just return that.
     /* XXX restore this
     if (this.timeLag == this._pauseTimeLag)
-      return this._pauseStartTime;
+      return this._previousCurrentTime;
       */
 
-    this._pauseStartTime =
+    this._previousCurrentTime =
         (this.timeline.currentTime - this.startTime) * this.playbackRate -
         this.timeLag;
-    return this._pauseStartTime;
+    return this._previousCurrentTime;
   },
-  get _unboundedCurrentTime() {
+  get _unlimitedCurrentTime() {
     if (this.timeline.currentTime === null) {
       return null;
     }
@@ -357,9 +357,9 @@ Player.prototype = {
       return this._pauseTimeLag;
     }
 
-    if (this.playbackRate < 0 && this._unboundedCurrentTime <= 0) {
-      if (this._pauseStartTime > 0) {
-        this._pauseStartTime = 0;
+    if (this.playbackRate < 0 && this._unlimitedCurrentTime <= 0) {
+      if (this._previousCurrentTime > 0) {
+        this._previousCurrentTime = 0;
       }
       this._storedTimeLag = this._pauseTimeLag;
       return this._pauseTimeLag;
@@ -367,9 +367,9 @@ Player.prototype = {
 
     var sourceContentEnd = this.source ? this.source.endTime : 0;
     if (this.playbackRate > 0 &&
-        this._unboundedCurrentTime >= sourceContentEnd) {
-      if (this._pauseStartTime < sourceContentEnd) {
-        this._pauseStartTime = sourceContentEnd;
+        this._unlimitedCurrentTime >= sourceContentEnd) {
+      if (this._previousCurrentTime < sourceContentEnd) {
+        this._previousCurrentTime = sourceContentEnd;
       }
       this._storedTimeLag = this._pauseTimeLag;
       return this._pauseTimeLag;
@@ -379,7 +379,7 @@ Player.prototype = {
   },
   get _pauseTimeLag() {
     return ((this.timeline.currentTime || 0) - this.startTime) *
-        this.playbackRate - this._pauseStartTime;
+        this.playbackRate - this._previousCurrentTime;
   },
   set startTime(startTime) {
     enterModifyCurrentAnimationState();
@@ -387,7 +387,7 @@ Player.prototype = {
       // This seeks by updating _startTime and hence the currentTime. It does
       // not affect _storedTimeLag.
       this._startTime = startTime;
-      this._pauseStartTime = null;
+      this._previousCurrentTime = null;
       playersAreSorted = false;
       this._update();
       maybeRestartAnimation();
@@ -405,10 +405,10 @@ Player.prototype = {
     }
     if (this._pausedState) {
       this._storedTimeLag = this.timeLag;
-      this._pauseStartTime = null;
+      this._previousCurrentTime = null;
       maybeRestartAnimation();
     } else {
-      this._pauseStartTime = this.currentTime;
+      this._previousCurrentTime = this.currentTime;
     }
     this._pausedState = isPaused;
   },
@@ -456,8 +456,8 @@ Player.prototype = {
     if (!this.source) {
       return;
     }
-    var effectivePosition = this._unboundedCurrentTime !== null ?
-                            this._unboundedCurrentTime :
+    var effectivePosition = this._unlimitedCurrentTime !== null ?
+                            this._unlimitedCurrentTime :
                             this.currentTime;
     if (this.playbackRate > 0 &&
         (effectivePosition < 0 ||
@@ -527,15 +527,15 @@ Player.prototype = {
     }
 
     if (this._needsHandlerPass) {
-      var timeDelta = this._unboundedCurrentTime - this._lastCurrentTime;
+      var timeDelta = this._unlimitedCurrentTime - this._lastCurrentTime;
       if (timeDelta > 0) {
         this.source._generateEvents(
-            this._lastCurrentTime, this._unboundedCurrentTime,
+            this._lastCurrentTime, this._unlimitedCurrentTime,
             this.timeline.currentTime, 1);
       }
     }
 
-    this._lastCurrentTime = this._unboundedCurrentTime;
+    this._lastCurrentTime = this._unlimitedCurrentTime;
   },
   _registerOnTimeline: function() {
     if (!this._registeredOnTimeline) {
