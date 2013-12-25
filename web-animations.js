@@ -342,7 +342,7 @@ Player.prototype = {
     // Basically, if the time lag we get back is equivalent to the
     // _pauseTimeLag, what we're really trying to do is create a time lag such
     // that the current time becomes the hold time so just return that.
-    /* XXXbb restore this
+    /* This doesn't seem to be needed
     if (this.timeLag == this._pauseTimeLag)
       return this._holdTime;
       */
