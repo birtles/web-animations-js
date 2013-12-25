@@ -481,16 +481,13 @@ Player.prototype = {
     if (!this.source) {
       return;
     }
-    var effectivePosition = this._unlimitedCurrentTime !== null ?
-                            this._unlimitedCurrentTime :
-                            this.currentTime;
     if (this.playbackRate > 0 &&
-        (effectivePosition < 0 ||
-         effectivePosition >= this.source.endTime)) {
+        (this.currentTime < 0 ||
+         this.currentTime >= this.source.endTime)) {
       this.currentTime = 0;
     } else if (this.playbackRate < 0 &&
-       (effectivePosition <= 0 ||
-        effectivePosition > this.source.endTime)) {
+       (this.currentTime <= 0 ||
+        this.currentTime > this.source.endTime)) {
       this.currentTime = this.source.endTime;
     }
   },
