@@ -264,6 +264,7 @@ var Player = function(token, source, timeline) {
       this.timeline.currentTime === null ? 0 : this.timeline.currentTime;
   this._storedTimeLag = 0.0;
   this._pausedState = false;
+  this._holdTime = null;
   this._previousCurrentTime = null;
   this._playbackRate = 1.0;
   this._hasTicked = false;
@@ -314,10 +315,17 @@ Player.prototype = {
     return this._currentTime === null ? 0 : this._currentTime;
   },
   set _currentTime(seekTime) {
-    // This seeks by updating _storedTimeLag. It does not affect the startTime.
+    // If we are paused or seeking to a time where limiting applies (i.e. beyond
+    // the end in the current direction), update the hold time.
     var sourceContentEnd = this.source ? this.source.endTime : 0;
-    this._previousCurrentTime = seekTime;
-    if (!this.paused) {
+    if (this.paused ||
+        (this.playbackRate > 0 && seekTime >= sourceContentEnd) ||
+        (this.playbackRate < 0 && seekTime <= 0)) {
+      this._holdTime = seekTime;
+    // Otherwise, clear the hold time (it may been set by previously seeking to
+    // a limited time) and update the time lag.
+    } else {
+      this._holdTime = null;
       this._storedTimeLag =
         ((this.timeline.currentTime || 0) - this.startTime) *
         this.playbackRate - seekTime;
@@ -333,10 +341,10 @@ Player.prototype = {
     // Here is another optimization to avoid floating-point inaccuracies.
     // Basically, if the time lag we get back is equivalent to the
     // _pauseTimeLag, what we're really trying to do is create a time lag such
-    // that the current time becomes the pause start time so just return that.
-    /* XXX restore this
+    // that the current time becomes the hold time so just return that.
+    /* XXXbb restore this
     if (this.timeLag == this._pauseTimeLag)
-      return this._previousCurrentTime;
+      return this._holdTime;
       */
 
     this._previousCurrentTime =
@@ -348,6 +356,8 @@ Player.prototype = {
     if (this.timeline.currentTime === null) {
       return null;
     }
+    if (this._holdTime)
+      return this._holdTime;
 
     return (this.timeline.currentTime - this.startTime) * this.playbackRate -
         this._storedTimeLag;
@@ -357,29 +367,44 @@ Player.prototype = {
       return this._pauseTimeLag;
     }
 
+    // Apply limiting at start of interval when playing in reverse
     if (this.playbackRate < 0 && this._unlimitedCurrentTime <= 0) {
-      if (this._previousCurrentTime > 0) {
-        this._previousCurrentTime = 0;
+      // The following seems counter-intuitive. It seems like we should take the
+      // minimum of 0 or the _previousCurrentTime (to match the behavior at the
+      // other end of the interval) but we never actually have a case where:
+      //
+      //  a) _holdTime is null AND
+      //  b) _previousCurrentTime is less than zero
+      //
+      // Because if _previousCurrentTime is less than zero it is because we have
+      // done a seek and _holdTime is set.
+      if (this._holdTime === null) {
+        this._holdTime = 0;
       }
-      this._storedTimeLag = this._pauseTimeLag;
       return this._pauseTimeLag;
     }
 
+    // Apply limiting at end of interval when playing forwards
     var sourceContentEnd = this.source ? this.source.endTime : 0;
     if (this.playbackRate > 0 &&
         this._unlimitedCurrentTime >= sourceContentEnd) {
-      if (this._previousCurrentTime < sourceContentEnd) {
-        this._previousCurrentTime = sourceContentEnd;
+      if (this._holdTime === null) {
+        this._holdTime = Math.max(this._previousCurrentTime, sourceContentEnd);
       }
-      this._storedTimeLag = this._pauseTimeLag;
       return this._pauseTimeLag;
+    }
+
+    // Finished limiting so store pause time lag
+    if (this._holdTime !== null) {
+      this._storedTimeLag = this._pauseTimeLag;
+      this._holdTime = null;
     }
 
     return this._storedTimeLag;
   },
   get _pauseTimeLag() {
     return ((this.timeline.currentTime || 0) - this.startTime) *
-        this.playbackRate - this._previousCurrentTime;
+        this.playbackRate - this._holdTime;
   },
   set startTime(startTime) {
     enterModifyCurrentAnimationState();
@@ -405,10 +430,10 @@ Player.prototype = {
     }
     if (this._pausedState) {
       this._storedTimeLag = this.timeLag;
-      this._previousCurrentTime = null;
+      this._holdTime = null;
       maybeRestartAnimation();
     } else {
-      this._previousCurrentTime = this.currentTime;
+      this._holdTime = this.currentTime;
     }
     this._pausedState = isPaused;
   },

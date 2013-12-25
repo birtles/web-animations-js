@@ -96,7 +96,7 @@ asyncTest("No bounding at start", function(assert) {
   }, 200);
 });
 
-asyncTest("Bounding at end (seek with current time)", function(assert) {
+asyncTest("Limiting at end (seek with current time)", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
@@ -121,7 +121,7 @@ asyncTest("Bounding at end (seek with current time)", function(assert) {
   }, 200);
 });
 
-asyncTest("Bounding at end (seek with start time)", function(assert) {
+asyncTest("Limiting at end (seek with start time)", function(assert) {
   var player =
     document.timeline.play(new Animation(null, null, { duration: 3 }));
 
@@ -681,6 +681,52 @@ asyncTest("Async add content", function(assert) {
       player.cancel();
       start();
     }, 200);
+  }, 200);
+});
+
+asyncTest("Setting negative playback rate in negative space", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+  
+  // Set a negative time and let it play for a while
+  player.currentTime = -1;
+  setTimeout(function() {
+    assert.close(player.currentTime, -0.8, 0.1, "currentTime after waiting");
+    equal(player.finished, false, "Finished state after waiting");
+
+    // Reverse
+    player.playbackRate = -1;
+    assert.close(player.currentTime, -0.8, 0.1, "currentTime after reversing");
+    equal(player.finished, true, "Finished state after reversing");
+
+    // Finish
+    player.cancel();
+    start();
+  }, 200);
+});
+
+asyncTest("Limiting at start", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Seek to just before end
+  player.reverse();
+  player.currentTime = 0.1;
+
+  // Check state of player
+  assert.close(player.currentTime, 0.1, 0.01, "Current time just before end");
+  equal(player.paused, false, "Paused state just before end");
+  equal(player.finished, false, "Finished state just before end");
+
+  // Check player after finishing
+  setTimeout(function() {
+    assert.close(player.currentTime, 0, 0.01, "Current time when limited");
+    equal(player.paused, false, "Paused state after ending");
+    equal(player.finished, true, "Finished state after ending");
+
+    // Finish
+    player.cancel();
+    start();
   }, 200);
 });
 
