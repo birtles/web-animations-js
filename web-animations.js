@@ -412,7 +412,7 @@ Player.prototype = {
       // This seeks by updating _startTime and hence the currentTime. It does
       // not affect _storedTimeLag.
       this._startTime = startTime;
-      this._previousCurrentTime = null;
+      this._holdTime = null;
       playersAreSorted = false;
       this._update();
       maybeRestartAnimation();

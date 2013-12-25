@@ -356,6 +356,27 @@ test("Adjust start time (3)", function(assert) {
   player.cancel();
 });
 
+test("Adjust start time (4)", function(assert) {
+  var player =
+    document.timeline.play(new Animation(null, null, { duration: 3 }));
+
+  // Put player in limited stage
+  player.startTime = document.timeline.currentTime - 4;
+
+  equal(player.currentTime, 3, "currentTime state while limited");
+  equal(player.finished, true, "Finished state while limited");
+
+  // Then put it in range
+  player.startTime += 2;
+  assert.close(player.currentTime, 2, 0.1,
+               "currentTime after updating start time");
+  equal(player.finished, false,
+        "Finished state while after updating start time");
+
+  // Finish
+  player.cancel();
+});
+
 asyncTest("Reversing playbackRate before start", function(assert) {
   // Set up player to start in 0.1s
   var player =
